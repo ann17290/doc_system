@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>ระบบจัดทำเอกสารควบคุมคุณภาพ - PGI</title>
+  <style>
+    /* --------------------------------------------------
+       การตั้งค่าพื้นฐานและฟอนต์
+    -------------------------------------------------- */
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Angsana New", "TH Sarabun New", sans-serif;
+      font-size: 14pt;
+      line-height: 1.25;
+      color: #000;
+      background-color: #525659;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* ลำดับขนาดตัวอักษรตามมาตรฐาน */
+    .doc-main-title {
+      font-size: 20pt;
+      font-weight: bold;
+      text-align: center;
+      margin: 10px 0 14px 0;
+    }
+    .section-title {
+      font-size: 16pt;
+      font-weight: bold;
+      margin-top: 14px;
+      margin-bottom: 4px;
+    }
+    .content-text, p, td, th {
+      font-size: 14pt;
+    }
+
+    /* --------------------------------------------------
+       แผงควบคุมด้านซ้าย (Sidebar Settings Panel)
+    -------------------------------------------------- */
+    .sidebar {
+      width: 400px;
+      min-width: 400px;
+      background: #ffffff;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid #ccc;
+      display: flex;
+      flex-direction: column;
+      font-family: sans-serif;
+      font-size: 13px;
+    }
+    .tabs-nav {
+      display: flex;
+      background: #20262e;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 12px 6px;
+      background: none;
+      border: none;
+      color: #bbb;
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+      transition: 0.2s;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: #0056b3;
+      border-bottom: 3px solid #0056b3;
+    }
+    .settings-content {
+      padding: 16px;
+      flex: 1;
+      overflow-y: auto;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-weight: bold;
+      margin-bottom: 4px;
+      color: #333;
+    }
+    .form-control {
+      width: 100%;
+      padding: 6px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+    textarea.form-control {
+      resize: vertical;
+      height: 75px;
+    }
+    .btn-action-area {
+      padding: 12px 16px;
+      background: #f8f9fa;
+      border-top: 1px solid #ddd;
+      display: flex;
+      gap: 10px;
+    }
+    .btn-print {
+      flex: 1;
+      background: #0056b3;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 4px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .btn-print:hover {
+      background: #004085;
+    }
+
+    /* --------------------------------------------------
+       พื้นที่แสดงผลแผ่นกระดาษ (Preview Area)
+    -------------------------------------------------- */
+    .preview-pane {
+      flex: 1;
+      overflow-y: auto;
+      padding: 30px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* แผ่นกระดาษจำลอง A4 พร้อมขอบ 1.5 cm */
+    .sheet-a4 {
+      background: #ffffff;
+      padding: 1.5cm;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+      box-sizing: border-box;
+      margin-bottom: 25px;
+    }
+
+    /* โหมดแนวตั้ง */
+    .sheet-portrait {
+      width: 210mm;
+      min-height: 297mm;
+    }
+
+    /* โหมดแนวนอน */
+    .sheet-landscape {
+      width: 297mm;
+      min-height: 210mm;
+    }
+
+    /* ตารางเอกสาร */
+    table.doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin-top: 8px;
+    }
+    table.doc-table th, table.doc-table td {
+      border: 1px solid #000;
+      padding: 4px 6px;
+      vertical-align: middle;
+      word-break: break-word;
+    }
+    table.doc-table th {
+      background: #fbfbfb;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    /* กล่องลงนาม */
+    .signature-grid {
+      display: flex;
+      border: 1px solid #000;
+      margin-top: 16px;
+      page-break-inside: avoid;
+    }
+    .sig-col {
+      flex: 1;
+      padding: 8px 10px;
+      text-align: center;
+      border-right: 1px solid #000;
+    }
+    .sig-col:last-child {
+      border-right: none;
+    }
+
+    /* --------------------------------------------------
+       คำสั่งจัดหน้าสำหรับพิมพ์ (Print / PDF)
+    -------------------------------------------------- */
+    @page {
+      margin: 1.5cm;
+    }
+    @page p-page {
+      size: A4 portrait;
+    }
+    @page l-page {
+      size: A4 landscape;
+    }
+
+    @media print {
+      body {
+        background: transparent;
+        height: auto;
+        overflow: visible;
+        display: block;
+      }
+      .sidebar {
+        display: none !important;
+      }
+      .preview-pane {
+        padding: 0;
+        display: block;
+        overflow: visible;
+      }
+      body.mode-portrait {
+        page: p-page;
+      }
+      body.mode-landscape {
+        page: l-page;
+      }
+      .sheet-a4 {
+        width: 100% !important;
+        min-height: auto !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        page-break-after: always;
+      }
+      .sheet-a4:last-child {
+        page-break-after: auto;
+      }
+    }
+  </style>
+</head>
+<body class="mode-landscape">
+
+  <!-- 1. แผงเมนูด้านซ้าย -->
+  <div class="sidebar">
+    <div class="tabs-nav">
+      <button class="tab-btn active" onclick="switchTab('FM')">FM</button>
+      <button class="tab-btn" onclick="switchTab('WI')">WI</button>
+      <button class="tab-btn" onclick="switchTab('PM')">PM</button>
+      <button class="tab-btn" onclick="switchTab('QP')">QP</button>
+    </div>
+
+    <div class="settings-content">
+      <!-- โลโก้และทิศทางหน้ากระดาษทั่วไป -->
+      <div class="form-group">
+        <label>โลโก้บริษัท</label>
+        <input type="file" id="logo-input" accept="image/*" class="form-control" onchange="loadLogo(event)">
+      </div>
+
+      <div class="form-group">
+        <label>ทิศทางหน้ากระดาษ</label>
+        <select id="orient-select" class="form-control" onchange="changeOrient(this.value)">
+          <option value="landscape">แนวนอน (A4 Landscape)</option>
+          <option value="portrait">แนวตั้ง (A4 Portrait)</option>
+        </select>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid #eee; margin: 15px 0;">
+
+      <!-- ข้อมูลเอกสาร -->
+      <div class="form-group">
+        <label>รหัส / ครั้งที่แก้ไข / วันที่</label>
+        <input type="text" id="doc-code" class="form-control" value="FM-QA-01 Rev.00, 18/11/2024" oninput="renderDoc()">
+      </div>
+
+      <div class="form-group">
+        <label>ชื่อเอกสาร (หัวเรื่อง 20pt)</label>
+        <input type="text" id="doc-name" class="form-control" value="ทะเบียนวัตถุดิบ ส่วนผสม และบรรจุภัณฑ์" oninput="renderDoc()">
+      </div>
+
+      <!-- ฟิลด์เฉพาะของ FM -->
+      <div id="fm-fields">
+        <div class="form-group">
+          <label>ขอบข่าย</label>
+          <textarea id="fm-scope" class="form-control" oninput="renderDoc()">ครอบคลุมวัตถุดิบ ส่วนผสม และบรรจุภัณฑ์ ที่นำมาใช้ในกระบวนการผลิตผลิตภัณฑ์</textarea>
+        </div>
+        <div class="form-group">
+          <label>ชื่อผลิตภัณฑ์</label>
+          <input type="text" id="fm-prod" class="form-control" value="น้ำตาลบด (Caster Sugar), น้ำตาลไอซิ่ง (Icing Sugar) และน้ำตาลป่น (Ground Sugar)" oninput="renderDoc()">
+        </div>
+      </div>
+
+      <!-- ฟิลด์เฉพาะของ WI / PM / QP -->
+      <div id="proc-fields" style="display: none;">
+        <div class="form-group">
+          <label>1. วัตถุประสงค์</label>
+          <textarea id="doc-obj" class="form-control" oninput="renderDoc()">เพื่อให้มั่นใจว่ากระบวนการดำเนินงานสอดคล้องตามมาตรฐานที่กำหนด</textarea>
+        </div>
+        <div class="form-group">
+          <label>2. ขอบเขต</label>
+          <textarea id="doc-scope" class="form-control" oninput="renderDoc()">ครอบคลุมตั้งแต่เริ่มต้นรับมอบจนสิ้นสุดการส่งมอบงาน</textarea>
+        </div>
+        <div class="form-group">
+          <label>3. นิยาม</label>
+          <textarea id="doc-def" class="form-control" oninput="renderDoc()">COA: Certificate of Analysis</textarea>
+        </div>
+        <div class="form-group" id="qp-resp-block" style="display: none;">
+          <label>4. ความรับผิดชอบ (QP)</label>
+          <textarea id="doc-resp" class="form-control" oninput="renderDoc()">QA Manager: ควบคุมดูแลกระบวนการจัดการ NCR ทั้งหมด</textarea>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label id="steps-label">ขั้นตอน / ตารางเนื้อหา (คั่นด้วย |)</label>
+        <textarea id="doc-steps" class="form-control" style="height: 100px;" oninput="renderDoc()"></textarea>
+      </div>
+
+    </div>
+
+    <div class="btn-action-area">
+      <button class="btn-print" onclick="window.print()">พิมพ์ / บันทึก PDF</button>
+    </div>
+  </div>
+
+  <!-- 2. พื้นที่แสดงผลเอกสารจำลอง -->
+  <div class="preview-pane">
+    <div class="sheet-a4 sheet-landscape" id="doc-page">
+      <!-- โครงร่างกระดาษจะถูก Render โดย JavaScript -->
+    </div>
+  </div>
+
+  <script>
+    let currentTab = 'FM';
+    let companyLogo = '';
+
+    // โหลดโลโก้เป็น Base64
+    function loadLogo(e) {
+      const file = e.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          companyLogo = evt.target.result;
+          renderDoc();
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+
+    // เปลี่ยนทิศทางกระดาษ
+    function changeOrient(val) {
+      document.body.className = 'mode-' + val;
+      const page = document.getElementById('doc-page');
+      if (val === 'landscape') {
+        page.className = 'sheet-a4 sheet-landscape';
+      } else {
+        page.className = 'sheet-a4 sheet-portrait';
+      }
+    }
+
+    // สลับแท็บ
+    function switchTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+      event.target.classList.add('active');
+
+      const fmFields = document.getElementById('fm-fields');
+      const procFields = document.getElementById('proc-fields');
+      const qpRespBlock = document.getElementById('qp-resp-block');
+      const orientSelect = document.getElementById('orient-select');
+
+      if (tab === 'FM') {
+        fmFields.style.display = 'block';
+        procFields.style.display = 'none';
+        orientSelect.value = 'landscape';
+        changeOrient('landscape');
+        document.getElementById('doc-code').value = 'FM-QA-01 Rev.00, 18/11/2024';
+        document.getElementById('doc-name').value = 'ทะเบียนวัตถุดิบ ส่วนผสม และบรรจุภัณฑ์';
+      } else {
+        fmFields.style.display = 'none';
+        procFields.style.display = 'block';
+        orientSelect.value = 'portrait';
+        changeOrient('portrait');
+        qpRespBlock.style.display = (tab === 'QP') ? 'block' : 'none';
+
+        if (tab === 'WI') {
+          document.getElementById('doc-code').value = 'WI-QA-01 Rev.00, 18/11/2024';
+          document.getElementById('doc-name').value = 'วิธีปฏิบัติงาน เรื่อง การตรวจรับวัตถุดิบและบรรจุภัณฑ์';
+          document.getElementById('doc-steps').value = "4.1 | ตรวจสอบเอกสาร COA และใบส่งสินค้า | เจ้าหน้าที่คลัง\n4.2 | ตรวจลักษณะทางกายภาพตามมาตรฐาน | เจ้าหน้าที่ QA";
+        } else if (tab === 'PM') {
+          document.getElementById('doc-code').value = 'PM-QA-01 Rev.00, 18/11/2024';
+          document.getElementById('doc-name').value = 'ระเบียบปฏิบัติงาน เรื่อง การหาอายุผลิตภัณฑ์';
+          document.getElementById('doc-steps').value = "# การเตรียมตัวอย่าง\nจัดเตรียมตัวอย่างตามแผนการสุ่ม | ฝ่ายวิจัย\n# การวิเคราะห์ผล\nทำการตรวจวัดความชื้นและจุลินทรีย์ | ฝ่ายควบคุมคุณภาพ";
+        } else if (tab === 'QP') {
+          document.getElementById('doc-code').value = 'QP-QA-01 Rev.00, 18/11/2024';
+          document.getElementById('doc-name').value = 'ระเบียบปฏิบัติงาน เรื่อง การจัดการผลิตภัณฑ์ที่ไม่เป็นไปตามข้อกำหนด (NCR)';
+          document.getElementById('doc-steps').value = "5.1 | กักแยกผลิตภัณฑ์ที่ไม่เป็นไปตามมาตรฐาน | เจ้าหน้าที่ผลิต\n5.2 | ออกเอกสาร NCR และบันทึกประวัติ | QA";
+        }
+      }
+      renderDoc();
+    }
+
+    // เรนเดอร์เอกสาร
+    function renderDoc() {
+      const page = document.getElementById('doc-page');
+      const code = document.getElementById('doc-code').value;
+      const title = document.getElementById('doc-name').value;
+      
+      const logoHtml = companyLogo 
+        ? `<img src="${companyLogo}" style="max-height: 50px; max-width: 140px; object-fit: contain;">` 
+        : `<div style="font-weight:bold; font-size:18pt; border:1px solid #000; padding:2px 8px;">PGI</div>`;
+
+      let inner = `
+        <!-- Header -->
+        <table style="width:100%; border-bottom:1.5px solid #000; margin-bottom:8px; padding-bottom:4px;">
+          <tr>
+            <td style="border:none; width:50px;">${logoHtml}</td>
+            <td style="border:none; padding-left:10px;">
+              <div style="font-weight:bold; font-size:15pt;">บริษัท พีจีไอ ฟู้ดส์ อินเตอร์เนชันแนล จำกัด</div>
+              <div style="font-size:12pt;">PGI FOODS INTERNATIONAL COMPANY LIMITED</div>
+            </td>
+            <td style="border:none; text-align:right; vertical-align:top; font-size:12pt;">
+              <div>${code}</div>
+              <div>หน้าที่ 1/1</div>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Main Title -->
+        <div class="doc-main-title">${title}</div>
+      `;
+
+      if (currentTab === 'FM') {
+        const scope = document.getElementById('fm-scope').value;
+        const prod = document.getElementById('fm-prod').value;
+
+        inner += `
+          <div style="margin-bottom: 10px;">
+            <div><strong>ขอบข่าย:</strong> ${scope}</div>
+            <div><strong>ชื่อผลิตภัณฑ์:</strong> ${prod}</div>
+          </div>
+
+          <!-- Multi-level Table FM-QA-01 -->
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th rowspan="2" style="width: 5%;">ลำดับ</th>
+                <th rowspan="2" style="width: 23%;">ชื่อวัตถุดิบ/ส่วนผสม/บรรจุภัณฑ์</th>
+                <th rowspan="2" style="width: 14%;">ลักษณะปรากฏ</th>
+                <th colspan="2" style="width: 18%;">ชนิดบรรจุภัณฑ์</th>
+                <th rowspan="2" style="width: 10%;">ขนาดบรรจุ</th>
+                <th rowspan="2" style="width: 10%;">Shelf Life</th>
+                <th rowspan="2" style="width: 10%;">การจัดเก็บ</th>
+                <th rowspan="2" style="width: 10%;">เอกสารอ้างอิง</th>
+              </tr>
+              <tr>
+                <th style="width: 9%;">ชั้นนอก</th>
+                <th style="width: 9%;">ชั้นใน</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="text-align:center;">1</td><td>น้ำตาลทรายขาวบริสุทธิ์</td><td>เกล็ดสีขาว ไม่จับตัวเป็นก้อน</td>
+                <td style="text-align:center;">กระสอบพลาสติก</td><td style="text-align:center;">ถุง PE</td>
+                <td style="text-align:center;">50 kg</td><td style="text-align:center;">24 เดือน</td>
+                <td style="text-align:center;">ห้องแห้ง</td><td style="text-align:center;">SPEC-RM-01</td>
+              </tr>
+              ${[2,3,4,5,6].map(i => `<tr style="height:26px;"><td style="text-align:center;">${i}</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>`).join('')}
+            </tbody>
+          </table>
+        `;
+      } else {
+        const obj = document.getElementById('doc-obj').value;
+        const sc = document.getElementById('doc-scope').value;
+        const def = document.getElementById('doc-def').value;
+        const stepsRaw = document.getElementById('doc-steps').value;
+
+        inner += `
+          <div class="section-title">1. วัตถุประสงค์</div>
+          <div class="content-text">${obj}</div>
+          <div class="section-title">2. ขอบเขต</div>
+          <div class="content-text">${sc}</div>
+          <div class="section-title">3. นิยาม</div>
+          <div class="content-text">${def}</div>
+        `;
+
+        if (currentTab === 'QP') {
+          const resp = document.getElementById('doc-resp').value;
+          inner += `
+            <div class="section-title">4. ความรับผิดชอบ</div>
+            <div class="content-text">${resp}</div>
+          `;
+        }
+
+        const stepTitleNum = (currentTab === 'QP') ? '5' : '4';
+        const roleHeader = (currentTab === 'PM') ? 'ผู้รับผิดชอบ/ผู้ที่เกี่ยวข้อง' : 'ผู้รับผิดชอบ';
+
+        inner += `
+          <div class="section-title">${stepTitleNum}. ขั้นตอนการปฏิบัติงาน</div>
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th style="width: 12%;">ลำดับ</th>
+                <th style="width: 63%;">ขั้นตอนการปฏิบัติงาน</th>
+                <th style="width: 25%;">${roleHeader}</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        const lines = stepsRaw.split('\n');
+        lines.forEach((ln, idx) => {
+          if (!ln.trim()) return;
+          if (ln.startsWith('#')) {
+            inner += `<tr style="background:#f2f2f2;"><td colspan="3" style="font-weight:bold;">${ln.replace('#', '').trim()}</td></tr>`;
+          } else {
+            const parts = ln.split('|');
+            const c1 = parts[0] ? parts[0].trim() : `${stepTitleNum}.${idx+1}`;
+            const c2 = parts[1] ? parts[1].trim() : '';
+            const c3 = parts[2] ? parts[2].trim() : '';
+            inner += `<tr><td style="text-align:center;">${c1}</td><td>${c2}</td><td>${c3}</td></tr>`;
+          }
+        });
+
+        inner += `</tbody></table>`;
+      }
+
+      // กล่องลงนาม 3 ช่อง
+      inner += `
+        <div class="signature-grid">
+          <div class="sig-col">
+            <strong>ผู้จัดทำ</strong>
+            <div style="margin: 22px 0 4px 0;">(......................................................)</div>
+            <div>หัวหน้าฝ่ายประกันคุณภาพ</div>
+            <div>วันที่.........../............/............</div>
+          </div>
+          <div class="sig-col">
+            <strong>ผู้ทวนสอบ</strong>
+            <div style="margin: 22px 0 4px 0;">(......................................................)</div>
+            <div>ตัวแทนฝ่ายบริหาร</div>
+            <div>วันที่.........../............/............</div>
+          </div>
+          <div class="sig-col">
+            <strong>ผู้อนุมัติ</strong>
+            <div style="margin: 22px 0 4px 0;">(......................................................)</div>
+            <div>ผู้จัดการโรงงาน</div>
+            <div>วันที่.........../............/............</div>
+          </div>
+        </div>
+      `;
+
+      page.innerHTML = inner;
+    }
+
+    // เริ่มต้นแสดงผลหน้า FM
+    window.onload = () => {
+      renderDoc();
+    };
+  </script>
+</body>
+</html>
